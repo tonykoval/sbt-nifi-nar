@@ -1,12 +1,17 @@
 package sk.vub.sbt.nifi
 
-import sbt.Keys._
-import sbt.io.IO
-import sbt._
+import java.time.format.{DateTimeFormatterBuilder, SignStyle}
+import java.time.temporal.ChronoField._
+import java.time.{Instant, ZoneId, ZonedDateTime}
+import java.util.{Date, Locale}
 
+import buildinfo.BuildInfo
+import sbt.Keys._
+import sbt._
+import sbt.io.IO
+
+import scala.util.Try
 import scala.util.matching.Regex
-import autoImport._
-object autoImport extends NarKeys
 
 trait NarKeys {
   val narTargetDir = settingKey[File]("target directory to pack, default is target")
@@ -21,6 +26,10 @@ trait NarKeys {
   val narDuplicateJarStrategy = settingKey[String]("deal with duplicate jars. default to use latest version latest: use the jar with a higher version; exit: exit the task with error")
   val narJarNameConvention = settingKey[String]("default: (artifact name)-(version).jar; original: original JAR name; full: (organization).(artifact name)-(version).jar; no-version: (organization).(artifact name).jar")
 
+  val narDependencyGroupId = settingKey[String]("nar dependency group id, default: org.apache.nifi")
+  val narDependencyArtifactId = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
+
+  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.9.2)")
   val nar = taskKey[File]("create a nar package of the project")
 }
 
@@ -36,11 +45,16 @@ case class ModuleEntry(org: String, name: String, revision: VersionString, artif
   def toDependencyStr: String = s""""${org}" % "${name}" % "${revision}""""
 }
 
+object autoImport extends NarKeys
+
 object NarPlugin extends AutoPlugin {
 
   override val trigger: PluginTrigger = noTrigger
 
   override val requires: Plugins = plugins.JvmPlugin
+
+  object autoImport extends NarKeys
+  import autoImport._
 
   override lazy val projectSettings: Seq[Setting[_]] = Seq(
     narTargetDir := target.value,
@@ -51,6 +65,8 @@ object NarPlugin extends AutoPlugin {
     narExcludeArtifactTypes := Seq("source", "javadoc", "test"),
     narDuplicateJarStrategy := "latest",
     narJarNameConvention := "default",
+    narDependencyGroupId := "org.apache.nifi",
+    narDependencyArtifactId := "nifi-standard-services-api-nar",
     (mappings in nar) := Seq.empty,
     narAllUnmanagedJars := Def.taskDyn {
       val allUnmanagedJars = getFromSelectedProjects(thisProjectRef.value, unmanagedJars in Runtime, state.value, narExclude.value)
@@ -154,30 +170,68 @@ object NarPlugin extends AutoPlugin {
         IO.write(p, content)
       }
 
+      val systemZone = ZoneId.systemDefault().normalized()
+      val timestamp  = ZonedDateTime.ofInstant(Instant.ofEpochMilli(new Date().getTime), systemZone)
+      val buildTime  = humanReadableTimestampFormatter.format(timestamp)
+
+      // Check the current Git revision
+      val gitRevision: String = Try {
+        if((base / ".git").exists()) {
+          out.log.info(logPrefix + "Checking the git revision of the current project")
+          sys.process.Process("git rev-parse HEAD").!!
+        }
+        else {
+          "unknown"
+        }
+      }.getOrElse("unknown").trim
+
+      val gitBranch: String = Try {
+        if((base / ".git").exists()) {
+          out.log.info(logPrefix + "Checking the git branch of the current project")
+          sys.process.Process("git branch | grep \\* | cut -d ' ' -f2").!!
+        }
+        else {
+          "unknown"
+        }
+      }.getOrElse("unknown").trim
+
       write("MANIFEST.MF",
-        s"""
-          |Manifest-Version: 1.0
-          |Build-Branch: ??? (vub-development)
-          |Build-Timestamp: ??? (2019-09-30T10:45:01Z)
-          |Archiver-Version: Plexus Archiver
-          |Nar-Dependency-Group: org.apache.nifi
-          |Built-By: ??? (akoval)
-          |Nar-Id: ??? (nifi-utils-nar)
-          |Clone-During-Instance-Class-Loading: false
-          |Nar-Dependency-Version: ??? (1.8.0)
-          |Nar-Version: ??? (1.2.4)
-          |Build-Tag: ??? (nifi-1.8.0-RC3)
-          |Build-Revision: ??? (63f9abe)
-          |Nar-Group: ??? (sk.vub)
-          |Nar-Dependency-Id: ??? (nifi-standard-services-api-nar)
-          |Created-By: ??? (Apache Maven 3.5.4)
-          |Build-Jdk: ??? (1.8.0_222)
-          |""".stripMargin.trim)
+  "Manifest-Version: 1.0\n" +
+          s"Build-Branch: ${gitBranch}\n" +
+          s"Build-Timestamp: ${buildTime}\n" +
+          "Archiver-Version: Plexus Archiver\n" +
+          s"Nar-Dependency-Group: ${narDependencyGroupId.value}\n" +
+          s"Nar-Id: ${name.value}\n" +
+          "Clone-During-Instance-Class-Loading: false\n" +
+          s"Nar-Dependency-Version: ${nifiVersion.value}\n" +
+          s"Nar-Version: ${version.value}\n" +
+          s"Build-Revision: ${gitRevision}\n" +
+          s"Nar-Group: ${organization.value}\n" +
+          s"Nar-Dependency-Id: ${narDependencyArtifactId.value}\n" +
+          s"Created-By: ${BuildInfo.name}-${BuildInfo.version}\n" +
+          "Build-Jdk: ??? (1.8.0_222)\n"
+      )
 
       out.log.info(logPrefix + "done.")
       distDir
     }
   )
+
+  private val humanReadableTimestampFormatter = new DateTimeFormatterBuilder()
+    .parseCaseInsensitive()
+    .appendValue(YEAR, 4, 10, SignStyle.EXCEEDS_PAD)
+    .appendLiteral('-')
+    .appendValue(MONTH_OF_YEAR, 2)
+    .appendLiteral('-')
+    .appendValue(DAY_OF_MONTH, 2)
+    .appendLiteral('T')
+    .appendValue(HOUR_OF_DAY, 2)
+    .appendLiteral(':')
+    .appendValue(MINUTE_OF_HOUR, 2)
+    .appendLiteral(':')
+    .appendValue(SECOND_OF_MINUTE, 2)
+    .appendOffset("+HHMM", "Z")
+    .toFormatter(Locale.US)
 
   // copy from sbt-pack
   private def getFromSelectedProjects[T](
