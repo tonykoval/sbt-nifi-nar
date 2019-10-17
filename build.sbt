@@ -14,4 +14,8 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
   Seq("-Xmx1024M", "-Dplugin.version=" + version.value, "-Dplugin.name=" + name.value)
 }
 
+libraryDependencies ++= Seq(
+  "org.apache.commons" % "commons-compress" % "1.19"
+)
+
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)

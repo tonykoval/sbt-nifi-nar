@@ -5,7 +5,7 @@
 //
 //--------------------------------------
 
-package sk.vub.sbt.nifi
+package xerial.sbt.pack
 
 import scala.util.{Success, Try}
 

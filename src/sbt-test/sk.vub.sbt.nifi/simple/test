@@ -1,2 +1,2 @@
-> nar
-$ exists target/test.nar
+> narArchive
+$ exists target/test-0.1-SNAPSHOT.nar
