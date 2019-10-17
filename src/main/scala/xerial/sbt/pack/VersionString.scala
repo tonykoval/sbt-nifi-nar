@@ -57,6 +57,7 @@ object DefaultVersionStringOrdering extends Ordering[VersionString] {
             else compareNumberSequence(tail1, tail2)
           case _ => n1.compareTo(n2)
         }
+      case _ => 0
     }
 
     compareNumberSequence(a.numbers, b.numbers) match {
