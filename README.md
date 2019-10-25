@@ -19,7 +19,7 @@ Add `sbt-nifi-nar` plugin to your sbt configuration:
 **project/plugins.sbt**
 
 ```scala
-addSbtPlugin("sk.vub" % "sbt-nifi-nar" % "(version)")
+addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 ```
 
 #### Minimum configuration
