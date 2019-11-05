@@ -22,6 +22,10 @@ scmInfo := Some(
   )
 )
 
+developers := List(
+  Developer("tonykoval", "Anton Koval", "tony@tonykoval.com", url("http://tonykoval.com"))
+)
+
 sbtPlugin := true
 
 scalaVersion := "2.12.10"
