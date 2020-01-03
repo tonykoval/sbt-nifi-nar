@@ -18,6 +18,8 @@ Add `sbt-nifi-nar` plugin to your sbt configuration:
 
 **project/plugins.sbt**
 
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.tonykoval/sbt-nifi-nar/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.tonykoval/sbt-nifi-nar)
+
 ```scala
 addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 ```
