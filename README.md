@@ -1,4 +1,4 @@
-sbt-nifi-nar plugin
+sbt-nifi-nar plugin [![Actions Status](https://github.com/tonykoval/sbt-nifi-nar/workflows/build/badge.svg)](https://github.com/tonykoval/sbt-nifi-nar/actions) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.tonykoval/sbt-nifi-nar/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.tonykoval/sbt-nifi-nar)
 ========
 
 A sbt plugin for creating NiFi Archive bundles to support the classloader isolation model of NiFi.
