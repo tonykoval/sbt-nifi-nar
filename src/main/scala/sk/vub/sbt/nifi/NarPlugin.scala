@@ -1,15 +1,20 @@
 package sk.vub.sbt.nifi
 
-import java.io.{BufferedInputStream, BufferedOutputStream, FileInputStream, FileOutputStream}
+import java.io.{File => _, _}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
 import buildinfo.BuildInfo
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
+import org.apache.nifi.components.ConfigurableComponent
+import org.apache.nifi.documentation.html.HtmlDocumentationWriter
+import org.apache.nifi.nar.StandardExtensionDiscoveringManager
 import sbt.Keys._
+import sbt.internal.inc.classpath.ClasspathUtilities
 import sbt.io.IO
 import sbt.{Def, _}
+import complete.DefaultParsers._
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
@@ -36,6 +41,7 @@ trait NarKeys {
 
   val nar = taskKey[File]("create a nar folder of the project")
   val narArchive = taskKey[File]("create a nar package of the project")
+  val generateDoc = inputKey[Unit]("test")
 }
 
 object autoImport extends NarKeys
@@ -239,6 +245,24 @@ object NarPlugin extends AutoPlugin {
       addFilesToArchive(distDir)
       aos.close()
       targetDir / archiveName
+    },
+    generateDoc := {
+      compile in Compile
+      val classpath = (fullClasspath in Compile).value.map(_.data)
+      val loader = ClasspathUtilities.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
+
+      val extensionManager = new StandardExtensionDiscoveringManager()
+      val htmlDocumentationWriter = new HtmlDocumentationWriter(extensionManager)
+
+      val args: Seq[String] = spaceDelimited("<arg>").parsed
+      args.foreach{ classProcessor =>
+//        val processor = Class.forName("processors.NakedProcessor", true, loader).newInstance
+        val processor = Class.forName(classProcessor, true, loader).newInstance
+        val baos = new ByteArrayOutputStream()
+        htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, false)
+        println(new String(baos.toByteArray))
+        baos.close()
+      }
     }
   )
 }
