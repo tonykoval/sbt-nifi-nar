@@ -15,6 +15,7 @@ import sbt.internal.inc.classpath.ClasspathUtilities
 import sbt.io.IO
 import sbt.{Def, _}
 import complete.DefaultParsers._
+import org.clapper.classutil.ClassFinder
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
@@ -35,13 +36,15 @@ trait NarKeys {
   val narDuplicateJarStrategy = settingKey[String]("deal with duplicate jars. default to use latest version latest: use the jar with a higher version; exit: exit the task with error")
   val narJarNameConvention = settingKey[String]("default: (artifact name)-(version).jar; original: original JAR name; full: (organization).(artifact name)-(version).jar; no-version: (organization).(artifact name).jar")
   val narArchiveName = settingKey[String]("nar file name. Default is (project-name)-(version)")
-  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.9.2)")
+  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.10.0)")
   val narDependencyGroupId = settingKey[String]("nar dependency group id, default: org.apache.nifi")
   val narDependencyArtifactId = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
 
   val nar = taskKey[File]("create a nar folder of the project")
   val narArchive = taskKey[File]("create a nar package of the project")
-  val generateDoc = inputKey[Unit]("test")
+  val generateDocProcessor = inputKey[Unit]("test")
+  val findAllProcessors = taskKey[Seq[String]]("find all nifi processors of the project")
+  val printAllProcessors = inputKey[Unit]("find and print all nifi processors of the project")
 }
 
 object autoImport extends NarKeys
@@ -246,8 +249,7 @@ object NarPlugin extends AutoPlugin {
       aos.close()
       targetDir / archiveName
     },
-    generateDoc := {
-      compile in Compile
+    generateDocProcessor := {
       val classpath = (fullClasspath in Compile).value.map(_.data)
       val loader = ClasspathUtilities.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
 
@@ -263,6 +265,19 @@ object NarPlugin extends AutoPlugin {
         println(new String(baos.toByteArray))
         baos.close()
       }
+    },
+    findAllProcessors := {
+      val classpath = (fullClasspath in Compile).value.map(_.data)
+      val classFinder = ClassFinder(classpath)
+      ClassFinder
+        .concreteSubclasses("org.apache.nifi.processor.AbstractProcessor", classFinder.getClasses())
+        .map(x => x.name)
+        .toSeq
+    },
+    printAllProcessors := {
+      val processors = findAllProcessors.value
+      println("\u001B[36mFound processors: \u001B[0m")
+      processors.foreach(x => println(s"\u001B[1m${x}\u001B[0m"))
     }
   )
 }
