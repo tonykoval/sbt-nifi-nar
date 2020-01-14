@@ -37,7 +37,8 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
 
 libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-compress" % "1.19",
-  "org.clapper" %% "classutil" % "1.5.1"
+  "org.clapper" %% "classutil" % "1.5.1",
+  "org.jsoup" % "jsoup" % "1.11.3"
 )
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)

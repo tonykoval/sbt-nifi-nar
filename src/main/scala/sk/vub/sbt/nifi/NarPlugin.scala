@@ -16,10 +16,13 @@ import sbt.io.IO
 import sbt.{Def, _}
 import complete.DefaultParsers._
 import org.clapper.classutil.ClassFinder
+import org.jsoup.Jsoup
+import sjsonnew.support.scalajson.unsafe.PrettyPrinter
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
 
+import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
 
@@ -39,10 +42,11 @@ trait NarKeys {
   val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.10.0)")
   val narDependencyGroupId = settingKey[String]("nar dependency group id, default: org.apache.nifi")
   val narDependencyArtifactId = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
+  val generateDocDir = settingKey[String]("documentation directory name, default: docs")
 
   val nar = taskKey[File]("create a nar folder of the project")
   val narArchive = taskKey[File]("create a nar package of the project")
-  val generateDocProcessor = inputKey[Unit]("test")
+  val generateDocProcessors = inputKey[Unit]("generate documentation of the all nifi processors")
   val findAllProcessors = taskKey[Seq[String]]("find all nifi processors of the project")
   val printAllProcessors = inputKey[Unit]("find and print all nifi processors of the project")
 }
@@ -249,21 +253,49 @@ object NarPlugin extends AutoPlugin {
       aos.close()
       targetDir / archiveName
     },
-    generateDocProcessor := {
+    generateDocDir := "docs",
+    generateDocProcessors := {
+      // generate documentation
+      val out = streams.value
+      val base: File = new File(".")
+      def generate(htmlDocumentationWriter: HtmlDocumentationWriter, loader: ClassLoader, classProcessor: String): String = {
+        val processor = Class.forName(classProcessor, true, loader).newInstance
+        val baos = new ByteArrayOutputStream()
+        htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
+        baos.close()
+        val html = Jsoup.parse(baos.toString("UTF-8"))
+        html.head().select("link").remove()
+        html.head().append("<link rel=\"stylesheet\" href=\"css/component-usage.css\" type=\"text/css\"/>\n    <link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
+        html.html()
+      }
+
       val classpath = (fullClasspath in Compile).value.map(_.data)
       val loader = ClasspathUtilities.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
 
       val extensionManager = new StandardExtensionDiscoveringManager()
       val htmlDocumentationWriter = new HtmlDocumentationWriter(extensionManager)
 
-      val args: Seq[String] = spaceDelimited("<arg>").parsed
-      args.foreach{ classProcessor =>
-//        val processor = Class.forName("processors.NakedProcessor", true, loader).newInstance
-        val processor = Class.forName(classProcessor, true, loader).newInstance
-        val baos = new ByteArrayOutputStream()
-        htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, false)
-        println(new String(baos.toByteArray))
-        baos.close()
+      val docs: File = base / generateDocDir.value
+      docs.mkdir()
+
+      Seq("css/component-usage.css", "css/main.css").foreach{ file =>
+        val f: File = docs / file
+        IO.write(f,
+          Source.fromInputStream(
+            getClass
+              .getClassLoader
+              .getResourceAsStream(file)
+          ).mkString
+        )
+      }
+
+      val processors = findAllProcessors.value
+      out.log.info(s"found processors: ${processors.mkString(",")}")
+      processors.foreach{ processor =>
+        val name = processor.split("\\.").last
+        val f: File = docs / s"$name.html"
+        IO.write(f, generate(htmlDocumentationWriter, loader, processor))
+        out.log.info(s"${f.getPath} successfully created!")
       }
     },
     findAllProcessors := {
