@@ -1,23 +1,24 @@
 package sk.vub.sbt.nifi
 
 import java.io.{File => _, _}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
 import buildinfo.BuildInfo
+import javax.imageio.ImageIO
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
 import org.apache.nifi.components.ConfigurableComponent
 import org.apache.nifi.documentation.html.HtmlDocumentationWriter
 import org.apache.nifi.nar.StandardExtensionDiscoveringManager
+import org.clapper.classutil.ClassFinder
+import org.jsoup.Jsoup
 import sbt.Keys._
 import sbt.internal.inc.classpath.ClasspathUtilities
 import sbt.io.IO
 import sbt.{Def, _}
-import complete.DefaultParsers._
-import org.clapper.classutil.ClassFinder
-import org.jsoup.Jsoup
-import sjsonnew.support.scalajson.unsafe.PrettyPrinter
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
@@ -257,15 +258,21 @@ object NarPlugin extends AutoPlugin {
     generateDocProcessors := {
       // generate documentation
       val out = streams.value
+      val logPrefix = "[" + name.value + "] "
       val base: File = new File(".")
       def generate(htmlDocumentationWriter: HtmlDocumentationWriter, loader: ClassLoader, classProcessor: String): String = {
         val processor = Class.forName(classProcessor, true, loader).newInstance
         val baos = new ByteArrayOutputStream()
         htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
         baos.close()
-        val html = Jsoup.parse(baos.toString("UTF-8"))
-        html.head().select("link").remove()
-        html.head().append("<link rel=\"stylesheet\" href=\"css/component-usage.css\" type=\"text/css\"/>\n    <link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
+        val html = Jsoup.parse(baos.toString(StandardCharsets.UTF_8.name()))
+        html.head().select("link").forEach( element =>
+          element.attr("href", element.attr("href").replace("../../../../../css/component-usage.css", "css/component-usage.css"))
+        )
+        html.select("img").forEach ( element =>
+          element.attr("src", element.attr("src").replace("../../../../../html/images/iconInfo.png", "images/iconInfo.png"))
+        )
+        html.head().append("<link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
         html.html()
       }
 
@@ -278,24 +285,40 @@ object NarPlugin extends AutoPlugin {
       val docs: File = base / generateDocDir.value
       docs.mkdir()
 
-      Seq("css/component-usage.css", "css/main.css").foreach{ file =>
+      // copy resource files
+      Seq("css/component-usage.css", "css/main.css", "images/iconInfo.png").foreach{ file =>
         val f: File = docs / file
-        IO.write(f,
-          Source.fromInputStream(
-            getClass
-              .getClassLoader
-              .getResourceAsStream(file)
-          ).mkString
-        )
+        f.getParentFile.mkdir
+        Files.copy(getClass
+          .getClassLoader
+          .getResourceAsStream(file), f.toPath, StandardCopyOption.REPLACE_EXISTING)
       }
 
-      val processors = findAllProcessors.value
-      out.log.info(s"found processors: ${processors.mkString(",")}")
-      processors.foreach{ processor =>
-        val name = processor.split("\\.").last
-        val f: File = docs / s"$name.html"
-        IO.write(f, generate(htmlDocumentationWriter, loader, processor))
-        out.log.info(s"${f.getPath} successfully created!")
+      val processors = findAllProcessors.value.map(x => (x, x.split("\\.").last))
+
+      // index.html
+      val indexHtml = Source.fromInputStream(
+         getClass
+          .getClassLoader
+          .getResourceAsStream("index.html")
+        ).mkString
+      val html = Jsoup.parse(indexHtml)
+      html.select("title").forEach(x => x.text(name.value))
+      html.select("h1").forEach(x => x.text(name.value))
+      html.select("ul").append(
+        processors.map{ x =>
+          "<li><a href=\"./" + x._2 + ".html\">" + x._2 + "</a></li>"
+        }.mkString
+      )
+      val indexFile = docs / "index.html"
+      IO.write(indexFile, html.html())
+
+      // processors
+      out.log.info(logPrefix + s"found processors: ${processors.map(_._2).mkString(",")}")
+      processors.foreach{ x =>
+        val f: File = docs / s"${x._2}.html"
+        IO.write(f, generate(htmlDocumentationWriter, loader, x._1))
+        out.log.info(logPrefix + s"${f.getPath} successfully created!")
       }
     },
     findAllProcessors := {
