@@ -2,12 +2,11 @@ package sk.vub.sbt.nifi
 
 import java.io.{File => _, _}
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths, StandardCopyOption}
+import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
 import buildinfo.BuildInfo
-import javax.imageio.ImageIO
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
 import org.apache.nifi.components.ConfigurableComponent
@@ -265,6 +264,13 @@ object NarPlugin extends AutoPlugin {
         val baos = new ByteArrayOutputStream()
         htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
         baos.close()
+        val additionalDetails: Option[String] = {
+          Try {
+            val html = Source.fromResource(s"docs/$classProcessor/additionalDetails.html", loader).mkString
+            Jsoup.parse(html).body().html()
+          }.toOption
+        }
+
         val html = Jsoup.parse(baos.toString(StandardCharsets.UTF_8.name()))
         html.head().select("link").forEach( element =>
           element.attr("href", element.attr("href").replace("../../../../../css/component-usage.css", "css/component-usage.css"))
@@ -273,6 +279,9 @@ object NarPlugin extends AutoPlugin {
           element.attr("src", element.attr("src").replace("../../../../../html/images/iconInfo.png", "images/iconInfo.png"))
         )
         html.head().append("<link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
+        html.body().select("a[href=additionalDetails.html]").forEach( element =>
+          element.parent().tagName("div").html(additionalDetails.getOrElse(""))
+        )
         html.html()
       }
 

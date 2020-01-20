@@ -8,6 +8,7 @@ import org.apache.nifi.components.{AllowableValue, PropertyDescriptor}
 import org.apache.nifi.controller.ControllerService
 import org.apache.nifi.expression.ExpressionLanguageScope
 import org.apache.nifi.processor.util.StandardValidators
+import org.apache.nifi.serialization.RecordReaderFactory
 import org.apache.nifi.processor.{AbstractProcessor, ProcessContext, ProcessSession, Relationship}
 
 import scala.collection.JavaConverters._
@@ -77,7 +78,7 @@ class FullyDocumentedProcessor extends AbstractProcessor {
   val SERVICE_PROPERTY = new PropertyDescriptor.Builder()
     .name("Controller Service")
     .description("This is the controller service to use to do things")
-    .identifiesControllerService(classOf[SampleService])
+    .identifiesControllerService(classOf[RecordReaderFactory])
     .required(true)
     .build()
 

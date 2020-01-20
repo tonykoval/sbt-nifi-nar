@@ -10,6 +10,7 @@ lazy val root = (project in file("."))
 
     libraryDependencies ++= Seq(
       "org.apache.nifi" % "nifi-api",
-      "org.apache.nifi" % "nifi-utils"
+      "org.apache.nifi" % "nifi-utils",
+      "org.apache.nifi" % "nifi-record-serialization-service-api",
     ).map(_ % nifiVersion.value)
   )

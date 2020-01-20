@@ -50,4 +50,5 @@ libraryDependencies ++= Seq(
   "org.apache.nifi" % "nifi-documentation",
   "org.apache.nifi" % "nifi-framework-api",
   "org.apache.nifi" % "nifi-framework-nar-utils",
+  "org.apache.nifi" % "nifi-commons",
 ).map(_ % nifiVersion)
