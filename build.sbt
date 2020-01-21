@@ -1,5 +1,10 @@
 enablePlugins(SbtPlugin, ScriptedPlugin, BuildInfoPlugin)
 
+lazy val `2.10` = "2.10.7"
+lazy val `2.11` = "2.11.12"
+lazy val `2.12` = "2.12.10"
+lazy val `2.13` = "2.13.1"
+
 organization := "com.github.tonykoval"
 name := "sbt-nifi-nar"
 
@@ -28,7 +33,9 @@ developers := List(
 
 sbtPlugin := true
 
-scalaVersion := "2.12.10"
+crossScalaVersions := Seq(`2.10`, `2.11`, `2.12`, `2.13`)
+
+scalaVersion := `2.12`
 
 scriptedBufferLog := false
 scriptedLaunchOpts := { scriptedLaunchOpts.value ++
