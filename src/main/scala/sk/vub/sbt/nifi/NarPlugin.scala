@@ -1,19 +1,28 @@
 package sk.vub.sbt.nifi
 
-import java.io.{BufferedInputStream, BufferedOutputStream, FileInputStream, FileOutputStream}
+import java.io.{File => _, _}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
 import buildinfo.BuildInfo
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
+import org.apache.nifi.components.ConfigurableComponent
+import org.apache.nifi.documentation.html.HtmlDocumentationWriter
+import org.apache.nifi.nar.StandardExtensionDiscoveringManager
+import org.clapper.classutil.ClassFinder
+import org.jsoup.Jsoup
 import sbt.Keys._
+import sbt.internal.inc.classpath.ClasspathUtilities
 import sbt.io.IO
 import sbt.{Def, _}
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
 
+import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
 
@@ -30,12 +39,16 @@ trait NarKeys {
   val narDuplicateJarStrategy = settingKey[String]("deal with duplicate jars. default to use latest version latest: use the jar with a higher version; exit: exit the task with error")
   val narJarNameConvention = settingKey[String]("default: (artifact name)-(version).jar; original: original JAR name; full: (organization).(artifact name)-(version).jar; no-version: (organization).(artifact name).jar")
   val narArchiveName = settingKey[String]("nar file name. Default is (project-name)-(version)")
-  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.9.2)")
+  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.10.0)")
   val narDependencyGroupId = settingKey[String]("nar dependency group id, default: org.apache.nifi")
   val narDependencyArtifactId = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
+  val generateDocDir = settingKey[String]("documentation directory name, default: docs")
 
   val nar = taskKey[File]("create a nar folder of the project")
   val narArchive = taskKey[File]("create a nar package of the project")
+  val generateDocProcessors = inputKey[Unit]("generate documentation of the all nifi processors")
+  val findAllProcessors = taskKey[Seq[String]]("find all nifi processors of the project")
+  val printAllProcessors = inputKey[Unit]("find and print all nifi processors of the project")
 }
 
 object autoImport extends NarKeys
@@ -239,6 +252,96 @@ object NarPlugin extends AutoPlugin {
       addFilesToArchive(distDir)
       aos.close()
       targetDir / archiveName
+    },
+    generateDocDir := "docs",
+    generateDocProcessors := {
+      // generate documentation
+      val out = streams.value
+      val logPrefix = "[" + name.value + "] "
+      val base: File = new File(".")
+      def generate(htmlDocumentationWriter: HtmlDocumentationWriter, loader: ClassLoader, classProcessor: String): String = {
+        val processor = Class.forName(classProcessor, true, loader).newInstance
+        val baos = new ByteArrayOutputStream()
+        htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
+        baos.close()
+        val additionalDetails: Option[String] = {
+          Try {
+            val html = Source.fromResource(s"docs/$classProcessor/additionalDetails.html", loader).mkString
+            Jsoup.parse(html).body().html()
+          }.toOption
+        }
+
+        val html = Jsoup.parse(baos.toString(StandardCharsets.UTF_8.name()))
+        html.head().select("link").forEach( element =>
+          element.attr("href", element.attr("href").replace("../../../../../css/component-usage.css", "css/component-usage.css"))
+        )
+        html.select("img").forEach ( element =>
+          element.attr("src", element.attr("src").replace("../../../../../html/images/iconInfo.png", "images/iconInfo.png"))
+        )
+        html.head().append("<link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
+        html.body().select("a[href=additionalDetails.html]").forEach( element =>
+          element.parent().tagName("div").html(additionalDetails.getOrElse(""))
+        )
+        html.html()
+      }
+
+      val classpath = (fullClasspath in Compile).value.map(_.data)
+      val loader = ClasspathUtilities.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
+
+      val extensionManager = new StandardExtensionDiscoveringManager()
+      val htmlDocumentationWriter = new HtmlDocumentationWriter(extensionManager)
+
+      val docs: File = base / generateDocDir.value
+      docs.mkdir()
+
+      // copy resource files
+      Seq("css/component-usage.css", "css/main.css", "images/iconInfo.png").foreach{ file =>
+        val f: File = docs / file
+        f.getParentFile.mkdir
+        Files.copy(getClass
+          .getClassLoader
+          .getResourceAsStream(file), f.toPath, StandardCopyOption.REPLACE_EXISTING)
+      }
+
+      val processors = findAllProcessors.value.map(x => (x, x.split("\\.").last))
+
+      // index.html
+      val indexHtml = Source.fromInputStream(
+         getClass
+          .getClassLoader
+          .getResourceAsStream("index.html")
+        ).mkString
+      val html = Jsoup.parse(indexHtml)
+      html.select("title").forEach(x => x.text(name.value))
+      html.select("h1").forEach(x => x.text(name.value))
+      html.select("ul").append(
+        processors.map{ x =>
+          "<li><a href=\"./" + x._2 + ".html\">" + x._2 + "</a></li>"
+        }.mkString
+      )
+      val indexFile = docs / "index.html"
+      IO.write(indexFile, html.html())
+
+      // processors
+      out.log.info(logPrefix + s"found processors: ${processors.map(_._2).mkString(",")}")
+      processors.foreach{ x =>
+        val f: File = docs / s"${x._2}.html"
+        IO.write(f, generate(htmlDocumentationWriter, loader, x._1))
+        out.log.info(logPrefix + s"${f.getPath} successfully created!")
+      }
+    },
+    findAllProcessors := {
+      val classpath = (fullClasspath in Compile).value.map(_.data)
+      val classFinder = ClassFinder(classpath)
+      ClassFinder
+        .concreteSubclasses("org.apache.nifi.processor.AbstractProcessor", classFinder.getClasses())
+        .map(x => x.name)
+        .toSeq
+    },
+    printAllProcessors := {
+      val processors = findAllProcessors.value
+      println("\u001B[36mFound processors: \u001B[0m")
+      processors.foreach(x => println(s"\u001B[1m${x}\u001B[0m"))
     }
   )
 }

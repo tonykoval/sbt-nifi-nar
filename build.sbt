@@ -1,5 +1,10 @@
 enablePlugins(SbtPlugin, ScriptedPlugin, BuildInfoPlugin)
 
+lazy val `2.10` = "2.10.7"
+lazy val `2.11` = "2.11.12"
+lazy val `2.12` = "2.12.10"
+lazy val `2.13` = "2.13.1"
+
 organization := "com.github.tonykoval"
 name := "sbt-nifi-nar"
 
@@ -28,7 +33,9 @@ developers := List(
 
 sbtPlugin := true
 
-scalaVersion := "2.12.10"
+crossScalaVersions := Seq(`2.10`, `2.11`, `2.12`, `2.13`)
+
+scalaVersion := `2.12`
 
 scriptedBufferLog := false
 scriptedLaunchOpts := { scriptedLaunchOpts.value ++
@@ -36,7 +43,20 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
 }
 
 libraryDependencies ++= Seq(
-  "org.apache.commons" % "commons-compress" % "1.19"
+  "org.apache.commons" % "commons-compress" % "1.19",
+  "org.clapper" %% "classutil" % "1.5.1",
+  "org.jsoup" % "jsoup" % "1.11.3"
 )
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
+
+val nifiVersion = "1.11.4"
+
+libraryDependencies ++= Seq(
+  "org.apache.nifi" % "nifi-api",
+  "org.apache.nifi" % "nifi-documentation",
+  "org.apache.nifi" % "nifi-framework-api",
+  "org.apache.nifi" % "nifi-framework-nar-utils",
+  "org.apache.nifi" % "nifi-commons",
+  "org.apache.nifi" % "nifi-nar-utils"
+).map(_ % nifiVersion)
