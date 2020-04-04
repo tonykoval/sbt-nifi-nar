@@ -6,7 +6,7 @@ lazy val root = (project in file("."))
     name := "nifi-test-bundle",
     scalaVersion := "2.12.10",
     version := "0.1-SNAPSHOT",
-    nifiVersion := "1.10.0",
+    nifiVersion := "1.11.4",
 
     libraryDependencies ++= Seq(
       "org.apache.nifi" % "nifi-api",
