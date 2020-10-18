@@ -6,7 +6,6 @@ import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
 
-import buildinfo.BuildInfo
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
 import org.apache.nifi.components.ConfigurableComponent
@@ -15,7 +14,8 @@ import org.apache.nifi.nar.StandardExtensionDiscoveringManager
 import org.clapper.classutil.ClassFinder
 import org.jsoup.Jsoup
 import sbt.Keys._
-import sbt.internal.inc.classpath.ClasspathUtilities
+import sbt.Package.ManifestAttributes
+import sbt.internal.inc.classpath.ClasspathUtil
 import sbt.io.IO
 import sbt.{Def, _}
 import xerial.sbt.pack.PackPlugin._
@@ -203,20 +203,31 @@ object NarPlugin extends AutoPlugin {
         }
       }.getOrElse("unknown").trim
 
+      val packageOpts = packageOptions.value
+      val customManifestAttributes = packageOpts.flatMap {
+        case x: ManifestAttributes => Some(x)
+        case _ => None
+      }
+
+      val coreManifestAttributes = ManifestAttributes(
+        ("Manifest-Version", "1.0"),
+        ("Build-Branch", gitBranch),
+        ("Build-Timestamp", buildTime),
+        ("Archiver-Version", "Plexus Archiver"),
+        ("Nar-Dependency-Group", narDependencyGroupId.value),
+        ("Nar-Id", name.value),
+        ("Clone-During-Instance-Class-Loading", "false"),
+        ("Nar-Dependency-Version", nifiVersion.value),
+        ("Build-Revision", gitRevision),
+        ("Nar-Group", organization.value),
+        ("Nar-Dependency-Id", narDependencyArtifactId.value),
+        ("Created-By", s"${BuildInfo.name}-${BuildInfo.version}")
+      )
+
+      val mergeManifestAttributes = coreManifestAttributes.attributes ++ customManifestAttributes.flatMap(_.attributes)
+
       write("MANIFEST.MF",
-  "Manifest-Version: 1.0\n" +
-          s"Build-Branch: ${gitBranch}\n" +
-          s"Build-Timestamp: ${buildTime}\n" +
-          "Archiver-Version: Plexus Archiver\n" +
-          s"Nar-Dependency-Group: ${narDependencyGroupId.value}\n" +
-          s"Nar-Id: ${name.value}\n" +
-          "Clone-During-Instance-Class-Loading: false\n" +
-          s"Nar-Dependency-Version: ${nifiVersion.value}\n" +
-          s"Nar-Version: ${version.value}\n" +
-          s"Build-Revision: ${gitRevision}\n" +
-          s"Nar-Group: ${organization.value}\n" +
-          s"Nar-Dependency-Id: ${narDependencyArtifactId.value}\n" +
-          s"Created-By: ${BuildInfo.name}-${BuildInfo.version}\n"
+        mergeManifestAttributes.map(x => s"${x._1}: ${x._2}").mkString("\n") + "\n"
       )
 
       out.log.info(logPrefix + "done.")
@@ -285,8 +296,8 @@ object NarPlugin extends AutoPlugin {
         html.html()
       }
 
-      val classpath = (fullClasspath in Compile).value.map(_.data)
-      val loader = ClasspathUtilities.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
+      val classpath = (fullClasspath in Compile).value.map(_.data.toPath)
+      val loader = ClasspathUtil.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
 
       val extensionManager = new StandardExtensionDiscoveringManager()
       val htmlDocumentationWriter = new HtmlDocumentationWriter(extensionManager)
