@@ -13,13 +13,12 @@ licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0"
 publishMavenStyle := true
 publishArtifact in Test := false
 pomIncludeRepository := { _ => false }
-publishTo in ThisBuild := {
-  val nexus = "https://oss.sonatype.org/"
+publishTo := Some(
   if (isSnapshot.value)
-    Some("snapshots" at nexus + "content/repositories/snapshots")
+    Opts.resolver.sonatypeSnapshots
   else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
+    Opts.resolver.sonatypeStaging
+)
 scmInfo := Some(
   ScmInfo(
     url("https://github.com/tonykoval/sbt-nifi-nar"),
