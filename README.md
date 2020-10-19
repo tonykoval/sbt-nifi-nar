@@ -29,6 +29,7 @@ addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 
 ### Projects
  * https://github.com/tonykoval/nifi-vub-scala-bundle
+ * https://github.com/tonykoval/nifi-scala-bundle.g8
 
 #### Minimum configuration
 
