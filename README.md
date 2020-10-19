@@ -37,7 +37,7 @@ addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 // [Required] Enable plugin
 enablePlugins(NarPlugin)
 // [Required] Nifi version
-nifiVersion := "1.11.4"
+nifiVersion := "1.12.1"
 
 // [Optional] check trait `NarKeys`
 ```
@@ -47,7 +47,6 @@ Now you can use `sbt nar` command in your project.
 ### TODO
   * dependency graph
   * support extensions
-  * add more information in MANIFEST.MF
 
 ### Test
 To test sbt-nifi-nar plugin, run
