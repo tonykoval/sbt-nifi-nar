@@ -36,13 +36,21 @@ addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 ```
 // [Required] Enable plugin
 enablePlugins(NarPlugin)
+
 // [Required] Nifi version
 nifiVersion := "1.12.1"
 
 // [Optional] check trait `NarKeys`
+
+// [Optional] add manifest attributes
+packageOptions := Seq(
+  ManifestAttributes(
+    ("Custom-Key", "Custom-Value")
+  )
+)
 ```
 
-Now you can use `sbt nar` command in your project.
+Now you can use `sbt narArchive` command in your project.
 
 ### TODO
   * dependency graph
