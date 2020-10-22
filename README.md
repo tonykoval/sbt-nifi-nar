@@ -62,6 +62,9 @@ To test sbt-nifi-nar plugin, run
 
     $ sbt scripted
 
+### Contribute
+Any issues, feature requirement and contributions are welcome!
+
 ### License
 
 Except as otherwise noted this software is licensed under the
