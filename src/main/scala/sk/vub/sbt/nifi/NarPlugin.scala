@@ -224,7 +224,7 @@ object NarPlugin extends AutoPlugin {
         ("Created-By", s"${BuildInfo.name}-${BuildInfo.version}")
       )
 
-      val mergeManifestAttributes = coreManifestAttributes.attributes ++ customManifestAttributes.flatMap(_.attributes)
+      val mergeManifestAttributes = coreManifestAttributes.attributes.toMap ++ customManifestAttributes.flatMap(_.attributes.toMap)
 
       write("MANIFEST.MF",
         mergeManifestAttributes.map(x => s"${x._1}: ${x._2}").mkString("\n") + "\n"
