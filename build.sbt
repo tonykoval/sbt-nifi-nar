@@ -2,8 +2,8 @@ enablePlugins(SbtPlugin, ScriptedPlugin, BuildInfoPlugin)
 
 lazy val `2.10` = "2.10.7"
 lazy val `2.11` = "2.11.12"
-lazy val `2.12` = "2.12.12"
-lazy val `2.13` = "2.13.3"
+lazy val `2.12` = "2.12.14"
+lazy val `2.13` = "2.13.6"
 
 organization := "com.github.tonykoval"
 name := "sbt-nifi-nar"
@@ -50,7 +50,7 @@ libraryDependencies ++= Seq(
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
 buildInfoPackage := "sk.vub.sbt.nifi"
 
-val nifiVersion = "1.12.1"
+val nifiVersion = "1.13.2"
 
 libraryDependencies ++= Seq(
   "org.apache.nifi" % "nifi-api",
