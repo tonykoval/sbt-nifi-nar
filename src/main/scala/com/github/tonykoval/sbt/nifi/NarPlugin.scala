@@ -1,11 +1,10 @@
-package sk.vub.sbt.nifi
+package com.github.tonykoval.sbt.nifi
 
 import java.io.{File => _, _}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
-
 import org.apache.commons.compress.archivers.zip._
 import org.apache.commons.compress.utils.IOUtils
 import org.apache.nifi.components.ConfigurableComponent
@@ -18,6 +17,7 @@ import sbt.Package.ManifestAttributes
 import sbt.internal.inc.classpath.ClasspathUtil
 import sbt.io.IO
 import sbt.{Def, _}
+import sk.vub.sbt.nifi.BuildInfo
 import xerial.sbt.pack.PackPlugin._
 import xerial.sbt.pack.pack._
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
