@@ -184,7 +184,7 @@ object NarPlugin extends AutoPlugin {
       }
 
       // put the list of jars in a file
-      val bw = new BufferedWriter(new FileWriter(distDir / "META-INF" / "TODO"))
+      val bw = new BufferedWriter(new FileWriter(distDir / "META-INF" / "DEPENDENCIES"))
       for (line <- projectJars ++ projectDepsJars ++ unmanagedDepsJars ++ explicitDepsJars) {
         bw.write(line.relativeTo(distDir).get.toString)
         bw.newLine()
