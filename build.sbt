@@ -2,8 +2,8 @@ enablePlugins(SbtPlugin, ScriptedPlugin, BuildInfoPlugin)
 
 lazy val `2.10` = "2.10.7"
 lazy val `2.11` = "2.11.12"
-lazy val `2.12` = "2.12.14"
-lazy val `2.13` = "2.13.6"
+lazy val `2.12` = "2.12.15"
+lazy val `2.13` = "2.13.7"
 
 organization := "com.github.tonykoval"
 name := "sbt-nifi-nar"
@@ -11,7 +11,7 @@ name := "sbt-nifi-nar"
 homepage := Some(url("https://github.com/tonykoval/sbt-nifi-nar"))
 licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0"))
 publishMavenStyle := true
-publishArtifact in Test := false
+Test / publishArtifact := false
 pomIncludeRepository := { _ => false }
 publishTo := Some(
   if (isSnapshot.value)
@@ -42,15 +42,15 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
 }
 
 libraryDependencies ++= Seq(
-  "org.apache.commons" % "commons-compress" % "1.19",
+  "org.apache.commons" % "commons-compress" % "1.21",
   "org.clapper" %% "classutil" % "1.5.1",
-  "org.jsoup" % "jsoup" % "1.11.3"
+  "org.jsoup" % "jsoup" % "1.14.3"
 )
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
-buildInfoPackage := "sk.vub.sbt.nifi"
+buildInfoPackage := "com.github.tonykoval.sbt.nifi"
 
-val nifiVersion = "1.13.2"
+val nifiVersion = "1.15.3"
 
 libraryDependencies ++= Seq(
   "org.apache.nifi" % "nifi-api",

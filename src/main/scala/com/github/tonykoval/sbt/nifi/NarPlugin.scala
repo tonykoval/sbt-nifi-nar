@@ -1,25 +1,24 @@
 package com.github.tonykoval.sbt.nifi
 
-import java.io.{File => _, _}
+import java.io.{File as _, *}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.Date
-import org.apache.commons.compress.archivers.zip._
+import org.apache.commons.compress.archivers.zip.*
 import org.apache.commons.compress.utils.IOUtils
 import org.apache.nifi.components.ConfigurableComponent
 import org.apache.nifi.documentation.html.HtmlDocumentationWriter
 import org.apache.nifi.nar.StandardExtensionDiscoveringManager
 import org.clapper.classutil.ClassFinder
 import org.jsoup.Jsoup
-import sbt.Keys._
+import sbt.Keys.*
 import sbt.Package.ManifestAttributes
 import sbt.internal.inc.classpath.ClasspathUtil
 import sbt.io.IO
-import sbt.{Def, _}
-import sk.vub.sbt.nifi.BuildInfo
-import xerial.sbt.pack.PackPlugin._
-import xerial.sbt.pack.pack._
+import sbt.{Def, *}
+import xerial.sbt.pack.PackPlugin.*
+import xerial.sbt.pack.*
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
 
 import scala.io.Source
@@ -27,28 +26,28 @@ import scala.util.Try
 import scala.util.matching.Regex
 
 trait NarKeys {
-  val narTargetDir = settingKey[File]("target directory to pack, default is target")
-  val narDir = settingKey[String]("nar directory name")
-  val narLibJars = taskKey[Seq[(File, ProjectRef)]]("nar-lib-jars")
-  val narExclude = settingKey[Seq[String]]("specify projects whose dependencies will be excluded when packaging")
-  val narExcludeLibJars = settingKey[Seq[String]]("specify projects to exclude when packaging.  Its dependencies will be processed")
-  val narExcludeJars = settingKey[Seq[String]]("specify jar file name patterns to exclude when packaging")
-  val narExcludeArtifactTypes = settingKey[Seq[String]]("specify artifact types (e.g. javadoc) to exclude when packaging")
-  val narAllUnmanagedJars = taskKey[Seq[(Classpath, ProjectRef)]]("all unmanaged jar files")
-  val narModuleEntries = taskKey[Seq[ModuleEntry]]("modules that will be packed")
-  val narDuplicateJarStrategy = settingKey[String]("deal with duplicate jars. default to use latest version latest: use the jar with a higher version; exit: exit the task with error")
-  val narJarNameConvention = settingKey[String]("default: (artifact name)-(version).jar; original: original JAR name; full: (organization).(artifact name)-(version).jar; no-version: (organization).(artifact name).jar")
-  val narArchiveName = settingKey[String]("nar file name. Default is (project-name)-(version)")
-  val nifiVersion = settingKey[String]("nifi version, mandatory (e.g. 1.10.0)")
-  val narDependencyGroupId = settingKey[String]("nar dependency group id, default: org.apache.nifi")
-  val narDependencyArtifactId = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
-  val generateDocDir = settingKey[String]("documentation directory name, default: docs")
+  val narTargetDir: SettingKey[File] = settingKey[File]("target directory to pack, default is target")
+  val narDir: SettingKey[String] = settingKey[String]("nar directory name")
+  val narLibJars: TaskKey[Seq[(File, ProjectRef)]] = taskKey[Seq[(File, ProjectRef)]]("nar-lib-jars")
+  val narExclude: SettingKey[Seq[String]] = settingKey[Seq[String]]("specify projects whose dependencies will be excluded when packaging")
+  val narExcludeLibJars: SettingKey[Seq[String]] = settingKey[Seq[String]]("specify projects to exclude when packaging.  Its dependencies will be processed")
+  val narExcludeJars: SettingKey[Seq[String]] = settingKey[Seq[String]]("specify jar file name patterns to exclude when packaging")
+  val narExcludeArtifactTypes: SettingKey[Seq[String]] = settingKey[Seq[String]]("specify artifact types (e.g. javadoc) to exclude when packaging")
+  val narAllUnmanagedJars: TaskKey[Seq[(Classpath, ProjectRef)]] = taskKey[Seq[(Classpath, ProjectRef)]]("all unmanaged jar files")
+  val narModuleEntries: TaskKey[Seq[ModuleEntry]] = taskKey[Seq[ModuleEntry]]("modules that will be packed")
+  val narDuplicateJarStrategy: SettingKey[String] = settingKey[String]("deal with duplicate jars. default to use latest version latest: use the jar with a higher version; exit: exit the task with error")
+  val narJarNameConvention: SettingKey[String] = settingKey[String]("default: (artifact name)-(version).jar; original: original JAR name; full: (organization).(artifact name)-(version).jar; no-version: (organization).(artifact name).jar")
+  val narArchiveName: SettingKey[String] = settingKey[String]("nar file name. Default is (project-name)-(version)")
+  val nifiVersion: SettingKey[String] = settingKey[String]("nifi version, mandatory (e.g. 1.10.0)")
+  val narDependencyGroupId: SettingKey[String] = settingKey[String]("nar dependency group id, default: org.apache.nifi")
+  val narDependencyArtifactId: SettingKey[String] = settingKey[String]("nar dependency artifact id, default: nifi-standard-services-api-nar")
+  val generateDocDir: SettingKey[String] = settingKey[String]("documentation directory name, default: docs")
 
-  val nar = taskKey[File]("create a nar folder of the project")
-  val narArchive = taskKey[File]("create a nar package of the project")
-  val generateDocProcessors = inputKey[Unit]("generate documentation of the all nifi processors")
-  val findAllProcessors = taskKey[Seq[String]]("find all nifi processors of the project")
-  val printAllProcessors = inputKey[Unit]("find and print all nifi processors of the project")
+  val nar: TaskKey[File] = taskKey[File]("create a nar folder of the project")
+  val narArchive: TaskKey[File] = taskKey[File]("create a nar package of the project")
+  val generateDocProcessors: InputKey[Unit] = inputKey[Unit]("generate documentation of the all nifi processors")
+  val findAllProcessors: TaskKey[Seq[String]] = taskKey[Seq[String]]("find all nifi processors of the project")
+  val printAllProcessors: InputKey[Unit] = inputKey[Unit]("find and print all nifi processors of the project")
 }
 
 object autoImport extends NarKeys
@@ -60,9 +59,9 @@ object NarPlugin extends AutoPlugin {
   override val requires: Plugins = plugins.JvmPlugin
 
   object autoImport extends NarKeys
-  import autoImport._
+  import autoImport.*
 
-  override lazy val projectSettings: Seq[Setting[_]] = Seq(
+  override lazy val projectSettings: Seq[Setting[?]] = Seq(
     narTargetDir := target.value,
     narDir := "nar",
     narExclude := Seq.empty,
@@ -73,17 +72,18 @@ object NarPlugin extends AutoPlugin {
     narJarNameConvention := "default",
     narDependencyGroupId := "org.apache.nifi",
     narDependencyArtifactId := "nifi-standard-services-api-nar",
-    (mappings in nar) := Seq.empty,
+    (nar / mappings) := Seq.empty,
     narArchiveName := s"${name.value}-${version.value}",
     narAllUnmanagedJars := Def.taskDyn {
-      val allUnmanagedJars = getFromSelectedProjects(thisProjectRef.value, unmanagedJars in Runtime, state.value, narExclude.value)
+      val allUnmanagedJars = getFromSelectedProjects(thisProjectRef.value, (Runtime / unmanagedJars), state.value, narExclude.value)
       Def.task { allUnmanagedJars.value }
     }.value,
     narLibJars := Def.taskDyn {
-      val libJars = getFromSelectedProjects(thisProjectRef.value, packageBin in Runtime, state.value, narExcludeLibJars.value)
+      val libJars = getFromSelectedProjects(thisProjectRef.value, (Runtime / packageBin), state.value, narExcludeLibJars.value)
       Def.task { libJars.value }
     }.value,
     narModuleEntries := {
+      // copy from pack
       val out = streams.value
       val jarExcludeFilter: Seq[Regex] = narExcludeJars.value.map(_.r)
       def isExcludeJar(name: String): Boolean = {
@@ -107,7 +107,7 @@ object NarPlugin extends AutoPlugin {
           ModuleEntry(mid.organization, mid.name, VersionString(mid.revision), artifact.name, artifact.classifier, file)
         }
 
-      implicit val versionStringOrdering = DefaultVersionStringOrdering
+      implicit val versionStringOrdering: DefaultVersionStringOrdering.type = DefaultVersionStringOrdering
       val distinctDpJars = dependentJars
         .groupBy(_.noVersionModuleName)
         .flatMap {
@@ -125,7 +125,7 @@ object NarPlugin extends AutoPlugin {
                 sys.error("Unknown duplicate JAR strategy '%s'".format(x))
             }
         }
-      distinctDpJars.toSeq
+      distinctDpJars.toSeq.distinct.sortBy(_.noVersionModuleName)
     },
     nar := {
       // inspired from pack
@@ -146,33 +146,52 @@ object NarPlugin extends AutoPlugin {
       out.log.info(logPrefix  + "Copying libraries to " + rpath(base, libDir))
       val libs: Seq[File] = narLibJars.value.map(_._1)
       out.log.info(logPrefix + "project jars:\n" + libs.map(path => rpath(base, path)).mkString("\n"))
-      libs.foreach(l => IO.copyFile(l, libDir / l.getName))
+      val projectJars = libs.map(l => {
+        val dest = libDir / l.getName
+        IO.copyFile(l, dest)
+        dest
+      })
 
       // Copy dependent jars
       val distinctDpJars = narModuleEntries.value
-      out.log.info(logPrefix + "project dependencies:\n" + distinctDpJars.mkString("\n"))
+      out.log.info(logPrefix + "Copying project dependencies:")
       val jarNameConvention = narJarNameConvention.value
-      for (m <- distinctDpJars) {
+      val projectDepsJars = for (m <- distinctDpJars) yield {
         val targetFileName = resolveJarName(m, jarNameConvention)
-        IO.copyFile(m.file, libDir / targetFileName, preserveLastModified = true)
+        val dest           = libDir / targetFileName
+        out.log.info(s"${m}")
+        IO.copyFile(m.file, dest, true)
+        dest
       }
 
       // Copy unmanaged jars in ${baseDir}/lib folder
-      out.log.info(logPrefix + "unmanaged dependencies:")
-      for ((m, _) <- narAllUnmanagedJars.value; um <- m; f = um.data) {
-        out.log.info(logPrefix + f.getPath)
-        IO.copyFile(f, libDir / f.getName, preserveLastModified = true)
+      out.log.info(logPrefix + "Copying unmanaged dependencies:")
+      val unmanagedDepsJars = for ((m, projectRef) <- narAllUnmanagedJars.value; um <- m; f = um.data) yield {
+        out.log.info(f.getPath)
+        val dest = libDir / f.getName
+        IO.copyFile(f, dest, true)
+        dest
       }
 
       // Copy explicitly added dependencies
-      val mapped: Seq[(File, String)] = (mappings in nar).value
-      out.log.info(logPrefix + "explicit dependencies:")
-      for ((file, path) <- mapped) {
-        out.log.info(logPrefix + file.getPath)
-        IO.copyFile(file, distDir / "META-INF" / path, preserveLastModified = true)
+      val mapped: Seq[(File, String)] = (nar / mappings).value
+      out.log.info(logPrefix + "Copying explicit dependencies:")
+      val explicitDepsJars = for ((file, path) <- mapped) yield {
+        out.log.info(file.getPath)
+        val dest = distDir / path
+        IO.copyFile(file, dest, true)
+        dest
       }
 
-      def write(path: String, content: String) {
+      // put the list of jars in a file
+      val bw = new BufferedWriter(new FileWriter(distDir / "META-INF" / "TODO"))
+      for (line <- projectJars ++ projectDepsJars ++ unmanagedDepsJars ++ explicitDepsJars) {
+        bw.write(line.relativeTo(distDir).get.toString)
+        bw.newLine()
+      }
+      bw.close()
+
+      def write(path: String, content: String): Unit = {
         val p = distDir / "META-INF" / path
         out.log.info(logPrefix + "Generating %s".format(rpath(base, p)))
         IO.write(p, content)
@@ -296,7 +315,7 @@ object NarPlugin extends AutoPlugin {
         html.html()
       }
 
-      val classpath = (fullClasspath in Compile).value.map(_.data.toPath)
+      val classpath = (Compile / fullClasspath).value.map(_.data.toPath)
       val loader = ClasspathUtil.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
 
       val extensionManager = new StandardExtensionDiscoveringManager()
@@ -342,7 +361,7 @@ object NarPlugin extends AutoPlugin {
       }
     },
     findAllProcessors := {
-      val classpath = (fullClasspath in Compile).value.map(_.data)
+      val classpath = (Compile / fullClasspath).value.map(_.data)
       val classFinder = ClassFinder(classpath)
       ClassFinder
         .concreteSubclasses("org.apache.nifi.processor.AbstractProcessor", classFinder.getClasses())

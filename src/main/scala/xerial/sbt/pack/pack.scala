@@ -1,4 +1,4 @@
-package xerial.sbt.pack
+package xerial.sbt
 
 import java.io.File
 

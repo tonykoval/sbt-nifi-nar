@@ -9,19 +9,19 @@ package xerial.sbt.pack
 
 import scala.util.{Success, Try}
 
-/**
-  * Class to represent version strings
-  * @author Christian Hoffmeister
-  */
+/** Class to represent version strings
+ * @author
+ *   Christian Hoffmeister
+ */
 case class VersionString(numbers: List[String], suffix: Option[String]) {
   def major: String = numbers.head
   def minor: Option[String] = numbers.drop(1).headOption
   def patch: Option[String] = numbers.drop(2).headOption
 
-  override def toString = (numbers, suffix) match {
-    case (n, Some(s)) if n.nonEmpty  => "%s-%s".format(n.mkString("."), s)
-    case (n, None) if n.nonEmpty     => n.mkString(".")
-    case (n, Some(s)) if n.isEmpty => s
+  override def toString: String = (numbers, suffix) match {
+    case (n, Some(s)) if n.nonEmpty    => "%s-%s".format(n.mkString("."), s)
+    case (n, None) if n.nonEmpty       => n.mkString(".")
+    case (n, Some(s)) if n.isEmpty     => s
     case _                             => ""
   }
 }
@@ -57,7 +57,6 @@ object DefaultVersionStringOrdering extends Ordering[VersionString] {
             else compareNumberSequence(tail1, tail2)
           case _ => n1.compareTo(n2)
         }
-      case _ => 0
     }
 
     compareNumberSequence(a.numbers, b.numbers) match {
