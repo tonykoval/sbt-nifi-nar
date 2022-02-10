@@ -160,7 +160,7 @@ object NarPlugin extends AutoPlugin {
         val targetFileName = resolveJarName(m, jarNameConvention)
         val dest           = libDir / targetFileName
         out.log.info(s"${m}")
-        IO.copyFile(m.file, dest, true)
+        IO.copyFile(m.file, dest, preserveLastModified = true)
         dest
       }
 
@@ -169,7 +169,7 @@ object NarPlugin extends AutoPlugin {
       val unmanagedDepsJars = for ((m, projectRef) <- narAllUnmanagedJars.value; um <- m; f = um.data) yield {
         out.log.info(f.getPath)
         val dest = libDir / f.getName
-        IO.copyFile(f, dest, true)
+        IO.copyFile(f, dest, preserveLastModified = true)
         dest
       }
 
@@ -179,7 +179,7 @@ object NarPlugin extends AutoPlugin {
       val explicitDepsJars = for ((file, path) <- mapped) yield {
         out.log.info(file.getPath)
         val dest = distDir / path
-        IO.copyFile(file, dest, true)
+        IO.copyFile(file, dest, preserveLastModified = true)
         dest
       }
 
@@ -235,6 +235,7 @@ object NarPlugin extends AutoPlugin {
         ("Archiver-Version", "Plexus Archiver"),
         ("Nar-Dependency-Group", narDependencyGroupId.value),
         ("Nar-Id", name.value),
+        ("Nar-Version", version.value),
         ("Clone-During-Instance-Class-Loading", "false"),
         ("Nar-Dependency-Version", nifiVersion.value),
         ("Build-Revision", gitRevision),
@@ -243,10 +244,20 @@ object NarPlugin extends AutoPlugin {
         ("Created-By", s"${BuildInfo.name}-${BuildInfo.version}")
       )
 
+      // todo build timestamp ISO
+      // todo build-jdk
+      // todo (check another property in maven plugin
+      // order, first manifest version
+
       val mergeManifestAttributes = coreManifestAttributes.attributes.toMap ++ customManifestAttributes.flatMap(_.attributes.toMap)
 
       write("MANIFEST.MF",
-        mergeManifestAttributes.map(x => s"${x._1}: ${x._2}").mkString("\n") + "\n"
+        mergeManifestAttributes
+          .toSeq
+          .sortWith(_._1.toString < _._1.toString)
+          .map(x => s"${x._1}: ${x._2}")
+          .mkString("\n")
+        + "\n"
       )
 
       out.log.info(logPrefix + "done.")
