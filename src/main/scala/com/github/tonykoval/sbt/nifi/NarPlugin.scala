@@ -290,7 +290,7 @@ object NarPlugin extends AutoPlugin {
       val logPrefix = "[" + name.value + "] "
       val base: File = new File(".")
       def generate(htmlDocumentationWriter: HtmlDocumentationWriter, loader: ClassLoader, classProcessor: String): String = {
-        val processor = Class.forName(classProcessor, true, loader).newInstance
+        val processor = Class.forName(classProcessor, true, loader).getDeclaredConstructor().newInstance()
         val baos = new ByteArrayOutputStream()
         htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
         baos.close()

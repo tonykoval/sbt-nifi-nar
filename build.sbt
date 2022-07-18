@@ -50,7 +50,7 @@ libraryDependencies ++= Seq(
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
 buildInfoPackage := "com.github.tonykoval.sbt.nifi"
 
-val nifiVersion = "1.15.3"
+val nifiVersion = "1.16.3"
 
 libraryDependencies ++= Seq(
   "org.apache.nifi" % "nifi-api",
