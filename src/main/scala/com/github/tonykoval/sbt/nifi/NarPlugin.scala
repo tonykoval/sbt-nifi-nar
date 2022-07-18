@@ -21,6 +21,7 @@ import xerial.sbt.pack.PackPlugin.*
 import xerial.sbt.pack.*
 import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
 
+import java.util.jar.Attributes
 import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
@@ -117,7 +118,7 @@ object NarPlugin extends AutoPlugin {
             val latestRevision = revisions.last
             narDuplicateJarStrategy.value match {
               case "latest" =>
-                out.log.debug(s"Version conflict on $key. Using ${latestRevision} (found ${revisions.mkString(", ")})")
+                out.log.debug(s"Version conflict on $key. Using $latestRevision (found ${revisions.mkString(", ")})")
                 entries.filter(_.revision == latestRevision)
               case "exit" =>
                 sys.error(s"Version conflict on $key (found ${revisions.mkString(", ")})")
@@ -159,17 +160,17 @@ object NarPlugin extends AutoPlugin {
       val projectDepsJars = for (m <- distinctDpJars) yield {
         val targetFileName = resolveJarName(m, jarNameConvention)
         val dest           = libDir / targetFileName
-        out.log.info(s"${m}")
-        IO.copyFile(m.file, dest, true)
+        out.log.info(s"$m")
+        IO.copyFile(m.file, dest, preserveLastModified = true)
         dest
       }
 
       // Copy unmanaged jars in ${baseDir}/lib folder
       out.log.info(logPrefix + "Copying unmanaged dependencies:")
-      val unmanagedDepsJars = for ((m, projectRef) <- narAllUnmanagedJars.value; um <- m; f = um.data) yield {
+      val unmanagedDepsJars = for ((m, _) <- narAllUnmanagedJars.value; um <- m; f = um.data) yield {
         out.log.info(f.getPath)
         val dest = libDir / f.getName
-        IO.copyFile(f, dest, true)
+        IO.copyFile(f, dest, preserveLastModified = true)
         dest
       }
 
@@ -179,7 +180,7 @@ object NarPlugin extends AutoPlugin {
       val explicitDepsJars = for ((file, path) <- mapped) yield {
         out.log.info(file.getPath)
         val dest = distDir / path
-        IO.copyFile(file, dest, true)
+        IO.copyFile(file, dest, preserveLastModified = true)
         dest
       }
 
@@ -197,9 +198,7 @@ object NarPlugin extends AutoPlugin {
         IO.write(p, content)
       }
 
-      val systemZone = ZoneId.systemDefault().normalized()
-      val timestamp  = ZonedDateTime.ofInstant(Instant.ofEpochMilli(new Date().getTime), systemZone)
-      val buildTime  = humanReadableTimestampFormatter.format(timestamp)
+      val buildTime = Instant.now().toString
 
       // Check the current Git revision
       val gitRevision: String = Try {
@@ -222,31 +221,46 @@ object NarPlugin extends AutoPlugin {
         }
       }.getOrElse("unknown").trim
 
+      val buildJdk = sys.props("java.runtime.version")
+
       val packageOpts = packageOptions.value
       val customManifestAttributes = packageOpts.flatMap {
         case x: ManifestAttributes => Some(x)
         case _ => None
       }
 
+      val manifestAttribute = ManifestAttributes(
+        ("Manifest-Version", "1.0")
+      )
+
       val coreManifestAttributes = ManifestAttributes(
-        ("Manifest-Version", "1.0"),
         ("Build-Branch", gitBranch),
         ("Build-Timestamp", buildTime),
         ("Archiver-Version", "Plexus Archiver"),
         ("Nar-Dependency-Group", narDependencyGroupId.value),
         ("Nar-Id", name.value),
+        ("Nar-Version", version.value),
         ("Clone-During-Instance-Class-Loading", "false"),
         ("Nar-Dependency-Version", nifiVersion.value),
         ("Build-Revision", gitRevision),
         ("Nar-Group", organization.value),
         ("Nar-Dependency-Id", narDependencyArtifactId.value),
-        ("Created-By", s"${BuildInfo.name}-${BuildInfo.version}")
+        ("Created-By", s"${BuildInfo.name}-${BuildInfo.version}"),
+        ("Build-Jdk", buildJdk)
       )
 
-      val mergeManifestAttributes = coreManifestAttributes.attributes.toMap ++ customManifestAttributes.flatMap(_.attributes.toMap)
+      // todo (check another property in maven plugin
+
+      val mergeManifestAttributes: Seq[(Attributes.Name, String)] =
+        manifestAttribute.attributes.toSeq ++
+          (coreManifestAttributes.attributes.toMap ++ customManifestAttributes.flatMap(_.attributes.toMap))
+            .toSeq.sortWith(_._1.toString < _._1.toString)
 
       write("MANIFEST.MF",
-        mergeManifestAttributes.map(x => s"${x._1}: ${x._2}").mkString("\n") + "\n"
+        mergeManifestAttributes
+          .map(x => s"${x._1}: ${x._2}")
+          .mkString("\n")
+        + "\n"
       )
 
       out.log.info(logPrefix + "done.")
