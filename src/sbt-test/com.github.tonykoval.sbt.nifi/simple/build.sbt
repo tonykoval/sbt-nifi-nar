@@ -4,9 +4,9 @@ lazy val root = (project in file("."))
   .enablePlugins(NarPlugin)
   .settings(
     name := "nifi-test-bundle",
-    scalaVersion := "2.12.14",
+    scalaVersion := "2.12.15",
     version := "0.1-SNAPSHOT",
-    nifiVersion := "1.13.2",
+    nifiVersion := "1.16.3",
 
     libraryDependencies ++= Seq(
       "org.apache.nifi" % "nifi-api",

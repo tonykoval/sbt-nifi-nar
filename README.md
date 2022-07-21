@@ -39,7 +39,7 @@ addSbtPlugin("com.github.tonykoval" % "sbt-nifi-nar" % "(version)")
 enablePlugins(NarPlugin)
 
 // [Required] Nifi version
-nifiVersion := "1.13.2"
+nifiVersion := "1.15.3"
 
 // [Optional] check trait `NarKeys`
 

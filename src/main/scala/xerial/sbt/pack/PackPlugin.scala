@@ -1,11 +1,10 @@
 package xerial.sbt.pack
 
 import java.io.File
-import java.time.format.{DateTimeFormatterBuilder, SignStyle}
+import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder, SignStyle}
 import java.time.temporal.ChronoField.{DAY_OF_MONTH, HOUR_OF_DAY, MINUTE_OF_HOUR, MONTH_OF_YEAR, SECOND_OF_MINUTE, YEAR}
 import java.util.Locale
-
-import sbt.{Def, Project, ProjectRef, State, Task, TaskKey}
+import sbt.{ClasspathDep, Def, Project, ProjectRef, State, Task, TaskKey}
 
 object PackPlugin {
   case class ModuleEntry(org: String, name: String, revision: VersionString, artifactName: String, classifier: Option[String], file: File) {
@@ -20,14 +19,14 @@ object PackPlugin {
     def toDependencyStr: String = s""""${org}" % "${name}" % "${revision}""""
   }
 
-  val humanReadableTimestampFormatter = new DateTimeFormatterBuilder()
+  val humanReadableTimestampFormatter: DateTimeFormatter = new DateTimeFormatterBuilder()
     .parseCaseInsensitive()
     .appendValue(YEAR, 4, 10, SignStyle.EXCEEDS_PAD)
     .appendLiteral('-')
     .appendValue(MONTH_OF_YEAR, 2)
     .appendLiteral('-')
     .appendValue(DAY_OF_MONTH, 2)
-    .appendLiteral('T')
+    .appendLiteral(' ')
     .appendValue(HOUR_OF_DAY, 2)
     .appendLiteral(':')
     .appendValue(MINUTE_OF_HOUR, 2)
@@ -38,7 +37,7 @@ object PackPlugin {
 
   // copy from sbt-pack
   def getFromSelectedProjects[T](
-    contextProject:ProjectRef,
+    contextProject: ProjectRef,
     targetTask: TaskKey[T],
     state: State,
     exclude: Seq[String]
@@ -49,19 +48,21 @@ object PackPlugin {
     def transitiveDependencies(currentProject: ProjectRef): Seq[ProjectRef] = {
       def isExcluded(p: ProjectRef) = exclude.contains(p.project)
 
+      def isCompileConfig(cp: ClasspathDep[ProjectRef]) = cp.configuration.forall(_.contains("compile->"))
+
       // Traverse all dependent projects
       val children = Project
         .getProject(currentProject, structure)
         .toSeq
-        .flatMap{ _.dependencies.map(_.project) }
+        .flatMap { _.dependencies.filter(isCompileConfig).map(_.project) }
 
       (currentProject +: (children flatMap transitiveDependencies)) filterNot (isExcluded)
     }
     val projects: Seq[ProjectRef] = transitiveDependencies(contextProject).distinct
-    projects.map(p => (Def.task { ((targetTask in p).value, p) }) evaluate structure.data).join
+    projects.map(p => (Def.task { ((p / targetTask).value, p) }) evaluate structure.data).join
   }
 
-  def resolveJarName(m: ModuleEntry, convention: String) = {
+  def resolveJarName(m: ModuleEntry, convention: String): String = {
     convention match {
       case "original"   => m.originalFileName
       case "full"       => m.fullJarName
