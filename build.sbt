@@ -15,7 +15,7 @@ Test / publishArtifact := false
 pomIncludeRepository := { _ => false }
 publishTo := Some(
   if (isSnapshot.value)
-    Opts.resolver.sonatypeSnapshots
+    Opts.resolver.sonatypeOssSnapshots.head
   else
     Opts.resolver.sonatypeStaging
 )
@@ -43,8 +43,7 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
 
 libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-compress" % "1.21",
-  "org.clapper" %% "classutil" % "1.5.1",
-  "org.jsoup" % "jsoup" % "1.14.3"
+  "org.clapper" %% "classutil" % "1.5.1"
 )
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)

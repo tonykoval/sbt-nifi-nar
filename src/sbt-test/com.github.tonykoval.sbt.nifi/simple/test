@@ -1,9 +1,2 @@
 > narArchive
 $ exists target/nifi-test-bundle-0.1-SNAPSHOT.nar
-> generateDocProcessors
-$ exists docs/css/component-usage.css
-$ exists docs/css/main.css
-$ exists docs/images/iconInfo.png
-$ exists docs/index.html
-$ exists docs/FullyDocumentedProcessor.html
-$ exists docs/NakedProcessor.html

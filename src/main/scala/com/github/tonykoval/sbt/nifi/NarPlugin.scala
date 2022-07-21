@@ -1,28 +1,18 @@
 package com.github.tonykoval.sbt.nifi
 
-import java.io.{File as _, *}
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, StandardCopyOption}
-import java.time.{Instant, ZoneId, ZonedDateTime}
-import java.util.Date
 import org.apache.commons.compress.archivers.zip.*
 import org.apache.commons.compress.utils.IOUtils
-import org.apache.nifi.components.ConfigurableComponent
-import org.apache.nifi.documentation.html.HtmlDocumentationWriter
-import org.apache.nifi.nar.StandardExtensionDiscoveringManager
 import org.clapper.classutil.ClassFinder
-import org.jsoup.Jsoup
 import sbt.Keys.*
 import sbt.Package.ManifestAttributes
-import sbt.internal.inc.classpath.ClasspathUtil
 import sbt.io.IO
 import sbt.{Def, *}
 import xerial.sbt.pack.PackPlugin.*
 import xerial.sbt.pack.*
-import xerial.sbt.pack.{DefaultVersionStringOrdering, VersionString}
 
+import java.io.{File as _, *}
+import java.time.Instant
 import java.util.jar.Attributes
-import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
 
@@ -46,7 +36,6 @@ trait NarKeys {
 
   val nar: TaskKey[File] = taskKey[File]("create a nar folder of the project")
   val narArchive: TaskKey[File] = taskKey[File]("create a nar package of the project")
-  val generateDocProcessors: InputKey[Unit] = inputKey[Unit]("generate documentation of the all nifi processors")
   val findAllProcessors: TaskKey[Seq[String]] = taskKey[Seq[String]]("find all nifi processors of the project")
   val printAllProcessors: InputKey[Unit] = inputKey[Unit]("find and print all nifi processors of the project")
 }
@@ -296,83 +285,6 @@ object NarPlugin extends AutoPlugin {
       addFilesToArchive(distDir)
       aos.close()
       targetDir / archiveName
-    },
-    generateDocDir := "docs",
-    generateDocProcessors := {
-      // generate documentation
-      val out = streams.value
-      val logPrefix = "[" + name.value + "] "
-      val base: File = new File(".")
-      def generate(htmlDocumentationWriter: HtmlDocumentationWriter, loader: ClassLoader, classProcessor: String): String = {
-        val processor = Class.forName(classProcessor, true, loader).getDeclaredConstructor().newInstance()
-        val baos = new ByteArrayOutputStream()
-        htmlDocumentationWriter.write(processor.asInstanceOf[ConfigurableComponent], baos, true)
-        baos.close()
-        val additionalDetails: Option[String] = {
-          Try {
-            val html = Source.fromResource(s"docs/$classProcessor/additionalDetails.html", loader).mkString
-            Jsoup.parse(html).body().html()
-          }.toOption
-        }
-
-        val html = Jsoup.parse(baos.toString(StandardCharsets.UTF_8.name()))
-        html.head().select("link").forEach( element =>
-          element.attr("href", element.attr("href").replace("../../../../../css/component-usage.css", "css/component-usage.css"))
-        )
-        html.select("img").forEach ( element =>
-          element.attr("src", element.attr("src").replace("../../../../../html/images/iconInfo.png", "images/iconInfo.png"))
-        )
-        html.head().append("<link rel=\"stylesheet\" href=\"css/main.css\" type=\"text/css\"/>")
-        html.body().select("a[href=additionalDetails.html]").forEach( element =>
-          element.parent().tagName("div").html(additionalDetails.getOrElse(""))
-        )
-        html.html()
-      }
-
-      val classpath = (Compile / fullClasspath).value.map(_.data.toPath)
-      val loader = ClasspathUtil.makeLoader(classpath, getClass.getClassLoader, scalaInstance.value)
-
-      val extensionManager = new StandardExtensionDiscoveringManager()
-      val htmlDocumentationWriter = new HtmlDocumentationWriter(extensionManager)
-
-      val docs: File = base / generateDocDir.value
-      docs.mkdir()
-
-      // copy resource files
-      Seq("css/component-usage.css", "css/main.css", "images/iconInfo.png").foreach{ file =>
-        val f: File = docs / file
-        f.getParentFile.mkdir
-        Files.copy(getClass
-          .getClassLoader
-          .getResourceAsStream(file), f.toPath, StandardCopyOption.REPLACE_EXISTING)
-      }
-
-      val processors = findAllProcessors.value.map(x => (x, x.split("\\.").last))
-
-      // index.html
-      val indexHtml = Source.fromInputStream(
-         getClass
-          .getClassLoader
-          .getResourceAsStream("index.html")
-        ).mkString
-      val html = Jsoup.parse(indexHtml)
-      html.select("title").forEach(x => x.text(name.value))
-      html.select("h1").forEach(x => x.text(name.value))
-      html.select("ul").append(
-        processors.map{ x =>
-          "<li><a href=\"./" + x._2 + ".html\">" + x._2 + "</a></li>"
-        }.mkString
-      )
-      val indexFile = docs / "index.html"
-      IO.write(indexFile, html.html())
-
-      // processors
-      out.log.info(logPrefix + s"found processors: ${processors.map(_._2).mkString(",")}")
-      processors.foreach{ x =>
-        val f: File = docs / s"${x._2}.html"
-        IO.write(f, generate(htmlDocumentationWriter, loader, x._1))
-        out.log.info(logPrefix + s"${f.getPath} successfully created!")
-      }
     },
     findAllProcessors := {
       val classpath = (Compile / fullClasspath).value.map(_.data)
